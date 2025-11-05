@@ -1,0 +1,34 @@
+use crate::language::*;
+use std::collections::HashSet;
+
+grammar(used_variables: &mut HashSet<char>);
+
+pub Expr: Box<Expr> = {
+    #[precedence(level="0")]
+    Term,
+    #[precedence(level="1")] #[assoc(side="left")]
+    "!" <r:Expr> => Box::new(Expr::UnaryOp(UnaryOperation::Not(r))),
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Expr> "&" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::And(<>))),
+    <l:Expr> "|" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Or(<>))),
+    <l:Expr> "^" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Xor(<>))),
+    <l:Expr> "I" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Implies(<>))),
+    <l:Expr> "E" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Equates(<>))),
+};
+
+Term: Box<Expr> = {
+    Variable,
+    Constant,
+    "(" <Expr> ")" => <>,
+};
+
+Variable: Box<Expr> = r"[a-z]" => {
+    let ch = <>.chars().next().unwrap();
+    used_variables.insert(ch);
+    Box::new(Expr::Variable(ch))
+};
+
+Constant: Box<Expr> = {
+    "1" => Box::new(Expr::Constant(true)),
+    "0" => Box::new(Expr::Constant(false)),
+};
