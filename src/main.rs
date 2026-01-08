@@ -1,11 +1,15 @@
-use std::collections::{HashMap, HashSet};
-use lalrpop_util::lalrpop_mod;
 use clap::Parser;
+use lalrpop_util::lalrpop_mod;
 use prettytable::{Cell, Row, Table, format::Alignment};
+use std::collections::{HashMap, HashSet};
 
-use crate::{grammar::ExprParser, language::{BinaryOperation, Expr, UnaryOperation}};
+use crate::{
+    grammar::ExprParser,
+    language::{BinaryOperation, Expr, UnaryOperation},
+};
 
 mod language;
+mod proof;
 
 lalrpop_mod!(grammar);
 type Mappings = HashMap<char, bool>;
@@ -17,7 +21,9 @@ impl BinaryOperation {
             BinaryOperation::Or(a, b) => a.eval(mappings) || b.eval(mappings),
             BinaryOperation::Xor(a, b) => a.eval(mappings) || b.eval(mappings),
             BinaryOperation::Implies(a, b) => (!a.eval(mappings)) || b.eval(mappings),
-            BinaryOperation::Equates(a, b) => (a.eval(mappings) && b.eval(mappings)) || (!a.eval(mappings) && !b.eval(mappings)),
+            BinaryOperation::Equates(a, b) => {
+                (a.eval(mappings) && b.eval(mappings)) || (!a.eval(mappings) && !b.eval(mappings))
+            }
         }
     }
 }
@@ -41,10 +47,6 @@ impl Expr {
     }
 }
 
-
-
-
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -67,7 +69,6 @@ impl UsedVars {
     }
 }
 
-
 fn main() {
     let mut char_remap = HashMap::new();
     char_remap.insert('I', '⇒');
@@ -77,7 +78,6 @@ fn main() {
     char_remap.insert('|', '∨');
     char_remap.insert('^', '⊕');
 
-
     let args = Cli::parse();
     let expr = ExprParser::new();
     let mut used_vars = HashSet::new();
@@ -86,10 +86,20 @@ fn main() {
     used_vars.sort();
     let used_vars = UsedVars(used_vars);
 
-    let remapped_expression = args.expression.chars().map(|e| *char_remap.get(&e).unwrap_or(&e)).collect::<String>();
+    let remapped_expression = args
+        .expression
+        .chars()
+        .map(|e| *char_remap.get(&e).unwrap_or(&e))
+        .collect::<String>();
 
     let mut table = Table::new();
-    let mut header_row = Row::new(used_vars.0.iter().map(|x| Cell::new(&x.to_string())).collect());
+    let mut header_row = Row::new(
+        used_vars
+            .0
+            .iter()
+            .map(|x| Cell::new(&x.to_string()))
+            .collect(),
+    );
     header_row.add_cell(Cell::new(""));
     header_row.add_cell(Cell::new(&remapped_expression));
     table.add_row(header_row);
@@ -106,7 +116,19 @@ fn main() {
     let state_count = 2u32.pow(used_vars.0.len() as u32);
     for i_num in 0..state_count {
         let mappings = used_vars.derive_mapping(i_num);
-        let mut row = Row::new(used_vars.0.iter().map(|e| if *mappings.get(e).unwrap() { t_cell.clone() } else { f_cell.clone() }).collect());
+        let mut row = Row::new(
+            used_vars
+                .0
+                .iter()
+                .map(|e| {
+                    if *mappings.get(e).unwrap() {
+                        t_cell.clone()
+                    } else {
+                        f_cell.clone()
+                    }
+                })
+                .collect(),
+        );
         row.add_cell(Cell::new(""));
         row.add_cell(if parsed.eval(&mappings) {
             t_cell.clone()
