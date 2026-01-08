@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     grammar::ExprParser,
-    language::{BinaryOperation, Expr, UnaryOperation},
+    language::{BinaryOperation, Expr, UnaryOperation}, proof::Proof,
 };
 
 mod language;
@@ -51,8 +51,10 @@ impl Expr {
 #[command(version, about, long_about = None)]
 struct Cli {
     expression: String,
-    #[arg(long, short, default_value_t=false)]
+    #[arg(long, short, default_value_t = false)]
     no_table: bool,
+    #[arg(long, short, default_value_t = false)]
+    proof: bool,
 }
 
 struct UsedVars(pub Vec<char>);
@@ -70,27 +72,47 @@ impl UsedVars {
 }
 
 fn main() {
-    let mut char_remap = HashMap::new();
-    char_remap.insert('I', '⇒');
-    char_remap.insert('E', '⇔');
-    char_remap.insert('!', '¬');
-    char_remap.insert('&', '∧');
-    char_remap.insert('|', '∨');
-    char_remap.insert('^', '⊕');
-
-    let args = Cli::parse();
+    let args = Cli{ expression: "((p I q) & (q I r)) I (p I r)".to_string(), no_table: false, proof: true}; // Cli::parse();
     let expr = ExprParser::new();
     let mut used_vars = HashSet::new();
     let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
+    if args.proof {
+        let mut proof = Proof::create(&*parsed);
+        if proof.complete {
+            println!("Proof successful!");
+        } else {
+            println!("Proof FAILED!");
+        }
+
+        proof.frames.reverse();
+        let mut i = proof.frames.len();
+        for frame in proof.frames {
+            println!("==== Frame {i} ====");
+            for chain in frame.chains {
+                if chain.is_terminal() { print!("(AXIOM) "); }
+                print!("|- ");
+                if chain.formulas.len() > 1 {
+                    print!("{{");
+                }
+
+                print!("{}", chain.formulas.iter().map(|e| format!("{e}")).collect::<Vec<_>>().join(", "));
+
+                if chain.formulas.len() > 1 {
+                    print!("}}");
+                }
+
+                print!("      ");
+            }
+            i -= 1;
+            println!("\n");
+        }
+        return;
+    }
     let mut used_vars: Vec<char> = used_vars.into_iter().collect();
     used_vars.sort();
     let used_vars = UsedVars(used_vars);
 
-    let remapped_expression = args
-        .expression
-        .chars()
-        .map(|e| *char_remap.get(&e).unwrap_or(&e))
-        .collect::<String>();
+    let remapped_expression = format!("{parsed}");
 
     let mut table = Table::new();
     let mut header_row = Row::new(
