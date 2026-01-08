@@ -72,7 +72,7 @@ impl UsedVars {
 }
 
 fn main() {
-    let args = Cli{ expression: "((p I q) & (q I r)) I (p I r)".to_string(), no_table: false, proof: true}; // Cli::parse();
+    let args = Cli::parse();
     let expr = ExprParser::new();
     let mut used_vars = HashSet::new();
     let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
