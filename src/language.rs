@@ -8,7 +8,7 @@ pub enum Expr {
     UnaryOp(UnaryOperation, Box<Expr>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperation {
     And,
     Or,
@@ -17,7 +17,7 @@ pub enum BinaryOperation {
     Equates,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOperation {
     Not,
 }
@@ -74,7 +74,9 @@ impl Display for Expr {
         match self {
             Self::Variable(e) => write!(f, "{e}"),
             Self::Constant(c) => write!(f, "{}", if *c { '1' } else { '0' }),
+            Self::UnaryOp(un, a) if f.alternate() => write!(f, "{un:#}{a:#}"),
             Self::UnaryOp(un, a) => write!(f, "{un}{a}"),
+            Self::BinaryOp(bin, a, b) if f.alternate() => write!(f, "({a:#} {bin:#} {b:#})"),
             Self::BinaryOp(bin, a, b) => write!(f, "({a} {bin} {b})"),
         }
     }
@@ -82,20 +84,36 @@ impl Display for Expr {
 
 impl Display for UnaryOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Not => write!(f, "¬"),
+        if f.alternate() {
+            match self {
+                Self::Not => write!(f, "!"),
+            }
+        } else {
+            match self {
+                Self::Not => write!(f, "¬"),
+            }
         }
     }
 }
 
 impl Display for BinaryOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::And => write!(f, "∧"),
-            Self::Or => write!(f, "∨"),
-            Self::Xor => write!(f, "⊕"),
-            Self::Implies => write!(f, "⇒"),
-            Self::Equates => write!(f, "⇔"),
+        if f.alternate() {
+            match self {
+                Self::And => write!(f, "&"),
+                Self::Or => write!(f, "|"),
+                Self::Xor => write!(f, "^"),
+                Self::Implies => write!(f, "I"),
+                Self::Equates => write!(f, "E"),
+            }
+        } else {
+            match self {
+                Self::And => write!(f, "∧"),
+                Self::Or => write!(f, "∨"),
+                Self::Xor => write!(f, "⊕"),
+                Self::Implies => write!(f, "⇒"),
+                Self::Equates => write!(f, "⇔"),
+            }
         }
     }
 }

@@ -5,11 +5,14 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     grammar::ExprParser,
-    language::{BinaryOperation, Expr, UnaryOperation}, proof::Proof,
+    language::{BinaryOperation, Expr, UnaryOperation},
+    proof::Proof,
+    resolver::root_translate_to_resolvable,
 };
 
 mod language;
 mod proof;
+mod resolver;
 
 lalrpop_mod!(grammar);
 type Mappings = HashMap<char, bool>;
@@ -55,6 +58,8 @@ struct Cli {
     no_table: bool,
     #[arg(long, short, default_value_t = false)]
     proof: bool,
+    #[arg(long, short, default_value_t = false)]
+    to_normal: bool,
 }
 
 struct UsedVars(pub Vec<char>);
@@ -76,6 +81,14 @@ fn main() {
     let expr = ExprParser::new();
     let mut used_vars = HashSet::new();
     let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
+    if args.to_normal {
+        let mut converted = root_translate_to_resolvable(*parsed);
+        println!("Basic multi-operand form: {converted}");
+        converted.reduce_depth(0);
+        println!("Converted formula: {converted}");
+        println!("(Alternative): {:#}", Expr::from(&converted));
+        return;
+    }
     if args.proof {
         let mut proof = Proof::create_gentzen(&*parsed);
         if proof.complete {
@@ -89,13 +102,23 @@ fn main() {
         for frame in proof.frames {
             println!("==== Frame {i} ====");
             for chain in frame.chains {
-                if chain.is_terminal() { print!("(AXIOM) "); }
+                if chain.is_terminal() {
+                    print!("(AXIOM) ");
+                }
                 print!("|- ");
                 if chain.formulas.len() > 1 {
                     print!("{{");
                 }
 
-                print!("{}", chain.formulas.iter().map(|e| format!("{e}")).collect::<Vec<_>>().join(", "));
+                print!(
+                    "{}",
+                    chain
+                        .formulas
+                        .iter()
+                        .map(|e| format!("{e}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
 
                 if chain.formulas.len() > 1 {
                     print!("}}");

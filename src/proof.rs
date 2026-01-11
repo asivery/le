@@ -148,7 +148,12 @@ impl Proof {
                                     })
                                     .collect::<Vec<Chain>>();
                                 other_chains.extend_from_slice(&new_chains);
-                                frames.push(replace(&mut last_frame, Frame { chains: other_chains }));
+                                frames.push(replace(
+                                    &mut last_frame,
+                                    Frame {
+                                        chains: other_chains,
+                                    },
+                                ));
                                 continue 'main;
                             }
                         }
