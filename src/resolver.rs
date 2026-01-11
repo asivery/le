@@ -58,24 +58,28 @@ impl ResolutionRuleset {
 
     fn apply(&self, expr: &mut Expr) {
         // Check if expr matches. If so, translate. Then recurse.
-        for (pattern, output) in &self.rules {
-            if let Some(results) = pattern.try_match(expr) {
-                println!("Applying rule <{pattern} ===> {output}> to {expr}");
-                *expr = output.clone();
-                expr.substitute(&results);
-                // Recurse in case this also matches that rule.
-                self.apply(expr);
+        let mut reapply = true;
+        while reapply {
+            reapply = false;
+
+            match expr {
+                Expr::BinaryOp(_, a, b) => {
+                    self.apply(a);
+                    self.apply(b);
+                }
+                Expr::UnaryOp(_, a) => self.apply(a),
+                _ => {}
+            };
+
+            for (pattern, output) in &self.rules {
+                if let Some(results) = pattern.try_match(expr) {
+                    println!("Applying rule <{pattern} ===> {output}> to {expr}");
+                    *expr = output.clone();
+                    expr.substitute(&results);
+                    reapply = true;
+                }
             }
         }
-
-        match expr {
-            Expr::BinaryOp(_, a, b) => {
-                self.apply(a);
-                self.apply(b);
-            }
-            Expr::UnaryOp(_, a) => self.apply(a),
-            _ => {}
-        };
     }
 }
 
@@ -88,9 +92,12 @@ pub fn root_translate_to_resolvable(mut expr: Expr) -> MultiOperandOperation {
         ("!(a | b)", "(!a & !b)"),
         ("!!a", "a"),
         ("a ^ b", "(a | b) & (!a | !b)"),
+        ("a | (b & c)", "(a | b) & (a | c)"),
+        ("(a & b) | c", "(a | c) & (b | c)"),
+        ("a | (b | c)", "a | b | c"),
+        ("a & (b & c)", "a & b & c"),
     ])
     .apply(&mut expr);
-
     let mut res = translate_to_resolvable(expr);
     res.merge_inner();
     res
@@ -157,77 +164,6 @@ impl MultiOperandOperation {
             _ => {}
         }
     }
-
-    pub fn depth(&self) -> usize {
-        match self {
-            MultiOperandOperation::Value(_) => 0,
-            MultiOperandOperation::Operation {
-                operation: _,
-                values,
-            } => 1 + values.iter().map(|x| x.depth()).max().unwrap_or(0),
-        }
-    }
-
-    pub fn reduce_single_rollover(&mut self, depth: i32) {
-        match self {
-            Self::Operation { operation, values } => {
-                let mut merged = vec![];
-                values.retain_mut(|x| {
-                    if matches!(x, MultiOperandOperation::Value(_)) {
-                        merged.push(take(x));
-                        false
-                    } else {
-                        true
-                    }
-                });
-                if merged.is_empty() {
-                    merged.push(values.remove(0));
-                }
-                values.iter_mut().for_each(|e| {
-                    *e = match take(e) {
-                        MultiOperandOperation::Value(v) => {
-                            let mut merged = merged.clone();
-                            merged.push(MultiOperandOperation::Value(v));
-                            MultiOperandOperation::Operation {
-                                operation: *operation,
-                                values: merged,
-                            }
-                        },
-                        MultiOperandOperation::Operation {
-                            operation: sub_oper,
-                            values: sub_values,
-                        } => MultiOperandOperation::Operation {
-                            operation: sub_oper,
-                            values: sub_values
-                                .into_iter()
-                                .map(|e| {
-                                    let mut merged = merged.clone();
-                                    merged.push(e);
-                                    let mut new_sub = MultiOperandOperation::Operation {
-                                        operation: *operation,
-                                        values: merged,
-                                    };
-                                    new_sub.reduce_depth(depth + 1);
-                                    new_sub
-                                })
-                                .collect(),
-                        },
-                    };
-                });
-            }
-            Self::Value(_) => {
-                unreachable!();
-            } // Depth = 0.
-        }
-        self.merge_inner();
-    }
-
-    pub fn reduce_depth(&mut self, depth: i32) {
-        self.merge_inner();
-        while self.depth() > 2 {
-            self.reduce_single_rollover(depth);
-        }
-    }
 }
 
 impl Display for MultiOperandOperation {
@@ -280,14 +216,24 @@ impl From<&MultiOperandOperation> for Expr {
                 }
             }
             MultiOperandOperation::Operation { operation, values } => {
-                if values.len() < 2 { panic!("Impossible type"); }
+                if values.len() < 2 {
+                    panic!("Impossible type");
+                }
                 let new_op = match operation {
                     MultiOperandOperationType::And => BinaryOperation::And,
                     MultiOperandOperationType::Or => BinaryOperation::Or,
                 };
-                let mut current_top = Expr::BinaryOp(new_op, Box::from(Expr::from(&values[0])), Box::from(Expr::from(&values[1])));
+                let mut current_top = Expr::BinaryOp(
+                    new_op,
+                    Box::from(Expr::from(&values[0])),
+                    Box::from(Expr::from(&values[1])),
+                );
                 for i in 2..values.len() {
-                    current_top = Expr::BinaryOp(new_op, Box::from(current_top), Box::from(Expr::from(&values[i])));
+                    current_top = Expr::BinaryOp(
+                        new_op,
+                        Box::from(current_top),
+                        Box::from(Expr::from(&values[i])),
+                    );
                 }
                 current_top
             }

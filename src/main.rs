@@ -82,11 +82,8 @@ fn main() {
     let mut used_vars = HashSet::new();
     let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
     if args.to_normal {
-        let mut converted = root_translate_to_resolvable(*parsed);
-        println!("Basic multi-operand form: {converted}");
-        converted.reduce_depth(0);
-        println!("Converted formula: {converted}");
-        println!("(Alternative): {:#}", Expr::from(&converted));
+        let converted = root_translate_to_resolvable(*parsed);
+        println!("Basic conjunctive form: {converted}");
         return;
     }
     if args.proof {
