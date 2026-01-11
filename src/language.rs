@@ -1,61 +1,25 @@
-use std::{collections::HashMap, fmt::Display, mem::discriminant};
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     Variable(char),
     Constant(bool),
-    BinaryOp(BinaryOperation),
-    UnaryOp(UnaryOperation),
+    BinaryOp(BinaryOperation, Box<Expr>, Box<Expr>),
+    UnaryOp(UnaryOperation, Box<Expr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOperation {
-    And(Box<Expr>, Box<Expr>),
-    Or(Box<Expr>, Box<Expr>),
-    Xor(Box<Expr>, Box<Expr>),
-    Implies(Box<Expr>, Box<Expr>),
-    Equates(Box<Expr>, Box<Expr>),
-}
-
-impl BinaryOperation {
-    fn split(&self) -> (&Box<Expr>, &Box<Expr>) {
-        match self {
-            Self::And(a, b) => (a, b),
-            Self::Or(a, b) => (a, b),
-            Self::Xor(a, b) => (a, b),
-            Self::Implies(a, b) => (a, b),
-            Self::Equates(a, b) => (a, b),
-        }
-    }
-
-    fn split_mut(&mut self) -> (&mut Box<Expr>, &mut Box<Expr>) {
-        match self {
-            Self::And(a, b) => (a, b),
-            Self::Or(a, b) => (a, b),
-            Self::Xor(a, b) => (a, b),
-            Self::Implies(a, b) => (a, b),
-            Self::Equates(a, b) => (a, b),
-        }
-    }
+    And,
+    Or,
+    Xor,
+    Implies,
+    Equates,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnaryOperation {
-    Not(Box<Expr>),
-}
-
-impl UnaryOperation {
-    fn inner(&self) -> &Box<Expr> {
-        match self {
-            Self::Not(e) => e,
-        }
-    }
-
-    fn inner_mut(&mut self) -> &mut Box<Expr> {
-        match self {
-            Self::Not(e) => e,
-        }
-    }
+    Not,
 }
 
 type ExprMap = HashMap<char, Expr>;
@@ -67,10 +31,8 @@ impl Expr {
             (Expr::Variable(v), other) => {
                 map.insert(*v, other.clone());
             }
-            (Expr::BinaryOp(self_bin), Expr::BinaryOp(other_bin)) => {
-                if discriminant(self_bin) == discriminant(other_bin) {
-                    let (s_a, s_b) = self_bin.split();
-                    let (o_a, o_b) = other_bin.split();
+            (Expr::BinaryOp(self_bin, s_a, s_b), Expr::BinaryOp(other_bin, o_a, o_b)) => {
+                if self_bin == other_bin {
                     map.extend(s_a.try_match(o_a)?);
                     map.extend(s_b.try_match(o_b)?);
                 } else {
@@ -80,10 +42,8 @@ impl Expr {
             (Expr::Constant(a), Expr::Constant(b)) if a != b => {
                 return None;
             }
-            (Expr::UnaryOp(self_un), Expr::UnaryOp(other_un)) => {
-                if discriminant(self_un) == discriminant(other_un) {
-                    let s_u = self_un.inner();
-                    let o_u = other_un.inner();
+            (Expr::UnaryOp(self_un, s_u), Expr::UnaryOp(other_un, o_u)) => {
+                if self_un == other_un {
                     map.extend(s_u.try_match(o_u)?);
                 } else {
                     return None;
@@ -99,12 +59,11 @@ impl Expr {
             Expr::Variable(e) if subexprs.contains_key(e) => {
                 *self = subexprs.get(e).unwrap().clone()
             }
-            Expr::BinaryOp(e) => {
-                let sub = e.split_mut();
-                sub.0.substitute(subexprs);
-                sub.1.substitute(subexprs);
+            Expr::BinaryOp(_, a, b) => {
+                a.substitute(subexprs);
+                b.substitute(subexprs);
             }
-            Expr::UnaryOp(e) => e.inner_mut().substitute(subexprs),
+            Expr::UnaryOp(_, e) => e.substitute(subexprs),
             _ => {}
         }
     }
@@ -115,8 +74,8 @@ impl Display for Expr {
         match self {
             Self::Variable(e) => write!(f, "{e}"),
             Self::Constant(c) => write!(f, "{}", if *c { '1' } else { '0' }),
-            Self::UnaryOp(un) => write!(f, "{un}"),
-            Self::BinaryOp(bin) => write!(f, "({bin})"),
+            Self::UnaryOp(un, a) => write!(f, "{un}{a}"),
+            Self::BinaryOp(bin, a, b) => write!(f, "({a} {bin} {b})"),
         }
     }
 }
@@ -124,7 +83,7 @@ impl Display for Expr {
 impl Display for UnaryOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Not(e) => write!(f, "¬{e}"),
+            Self::Not => write!(f, "¬"),
         }
     }
 }
@@ -132,11 +91,11 @@ impl Display for UnaryOperation {
 impl Display for BinaryOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::And(a, b) => write!(f, "{a} ∧ {b}"),
-            Self::Or(a, b) => write!(f, "{a} ∨ {b}"),
-            Self::Xor(a, b) => write!(f, "{a} ⊕ {b}"),
-            Self::Implies(a, b) => write!(f, "{a} ⇒ {b}"),
-            Self::Equates(a, b) => write!(f, "{a} ⇔ {b}"),
+            Self::And => write!(f, "∧"),
+            Self::Or => write!(f, "∨"),
+            Self::Xor => write!(f, "⊕"),
+            Self::Implies => write!(f, "⇒"),
+            Self::Equates => write!(f, "⇔"),
         }
     }
 }

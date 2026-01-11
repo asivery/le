@@ -7,13 +7,13 @@ pub Expr: Box<Expr> = {
     #[precedence(level="0")]
     Term,
     #[precedence(level="1")] #[assoc(side="left")]
-    "!" <r:Expr> => Box::new(Expr::UnaryOp(UnaryOperation::Not(r))),
+    "!" <r:Expr> => Box::new(Expr::UnaryOp(UnaryOperation::Not, <>)),
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:Expr> "&" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::And(<>))),
-    <l:Expr> "|" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Or(<>))),
-    <l:Expr> "^" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Xor(<>))),
-    <l:Expr> "I" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Implies(<>))),
-    <l:Expr> "E" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Equates(<>))),
+    <l:Expr> "&" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::And, <>)),
+    <l:Expr> "|" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Or, <>)),
+    <l:Expr> "^" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Xor, <>)),
+    <l:Expr> "I" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Implies, <>)),
+    <l:Expr> "E" <r:Expr> => Box::new(Expr::BinaryOp(BinaryOperation::Equates, <>)),
 };
 
 Term: Box<Expr> = {

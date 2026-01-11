@@ -15,13 +15,13 @@ lalrpop_mod!(grammar);
 type Mappings = HashMap<char, bool>;
 
 impl BinaryOperation {
-    pub fn eval(&self, mappings: &Mappings) -> bool {
+    pub fn eval(&self, mappings: &Mappings, a: &Expr, b: &Expr) -> bool {
         match self {
-            BinaryOperation::And(a, b) => a.eval(mappings) && b.eval(mappings),
-            BinaryOperation::Or(a, b) => a.eval(mappings) || b.eval(mappings),
-            BinaryOperation::Xor(a, b) => a.eval(mappings) || b.eval(mappings),
-            BinaryOperation::Implies(a, b) => (!a.eval(mappings)) || b.eval(mappings),
-            BinaryOperation::Equates(a, b) => {
+            BinaryOperation::And => a.eval(mappings) && b.eval(mappings),
+            BinaryOperation::Or => a.eval(mappings) || b.eval(mappings),
+            BinaryOperation::Xor => a.eval(mappings) || b.eval(mappings),
+            BinaryOperation::Implies => (!a.eval(mappings)) || b.eval(mappings),
+            BinaryOperation::Equates => {
                 (a.eval(mappings) && b.eval(mappings)) || (!a.eval(mappings) && !b.eval(mappings))
             }
         }
@@ -29,9 +29,9 @@ impl BinaryOperation {
 }
 
 impl UnaryOperation {
-    pub fn eval(&self, mappings: &Mappings) -> bool {
+    pub fn eval(&self, mappings: &Mappings, a: &Expr) -> bool {
         match self {
-            UnaryOperation::Not(a) => !a.eval(mappings),
+            UnaryOperation::Not => !a.eval(mappings),
         }
     }
 }
@@ -41,8 +41,8 @@ impl Expr {
         match self {
             Expr::Constant(x) => *x,
             Expr::Variable(x) => *mappings.get(x).unwrap(),
-            Expr::BinaryOp(bin) => bin.eval(mappings),
-            Expr::UnaryOp(un) => un.eval(mappings),
+            Expr::BinaryOp(bin, a, b) => bin.eval(mappings, a, b),
+            Expr::UnaryOp(un, a) => un.eval(mappings, a),
         }
     }
 }
@@ -77,7 +77,7 @@ fn main() {
     let mut used_vars = HashSet::new();
     let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
     if args.proof {
-        let mut proof = Proof::create(&*parsed);
+        let mut proof = Proof::create_gentzen(&*parsed);
         if proof.complete {
             println!("Proof successful!");
         } else {

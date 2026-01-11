@@ -78,7 +78,7 @@ impl Chain {
             .collect::<Vec<char>>();
         for form in &self.formulas {
             match form {
-                Expr::UnaryOp(UnaryOperation::Not(z)) => match &**z {
+                Expr::UnaryOp(UnaryOperation::Not, z) => match &**z {
                     Expr::Variable(z) if vars.contains(z) => return true,
                     _ => {}
                 },
@@ -101,7 +101,7 @@ pub struct Proof {
 }
 
 impl Proof {
-    pub fn create(expr: &Expr) -> Self {
+    pub fn create_gentzen(expr: &Expr) -> Self {
         let rules = create_gentzen_rules();
         let mut last_frame = Frame {
             chains: vec![Chain {
