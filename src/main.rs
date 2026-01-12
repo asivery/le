@@ -59,7 +59,7 @@ struct Cli {
     #[arg(long, short, default_value_t = false)]
     proof: bool,
     #[arg(long, short, default_value_t = false)]
-    to_normal: bool,
+    clause: bool,
 }
 
 struct UsedVars(pub Vec<char>);
@@ -76,58 +76,54 @@ impl UsedVars {
     }
 }
 
-fn main() {
-    let args = Cli::parse();
-    let expr = ExprParser::new();
-    let mut used_vars = HashSet::new();
-    let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
-    if args.to_normal {
-        let converted = root_translate_to_resolvable(*parsed);
-        println!("Basic conjunctive form: {converted}");
-        return;
+fn run_clause(parsed: Box<Expr>) {
+    let converted = root_translate_to_resolvable(*parsed);
+    println!("Clause form: {converted}");
+}
+
+fn run_proof(parsed: Box<Expr>) {
+    let mut proof = Proof::create_gentzen(&*parsed);
+    if proof.complete {
+        println!("Proof successful!");
+    } else {
+        println!("Proof FAILED!");
     }
-    if args.proof {
-        let mut proof = Proof::create_gentzen(&*parsed);
-        if proof.complete {
-            println!("Proof successful!");
-        } else {
-            println!("Proof FAILED!");
-        }
 
-        proof.frames.reverse();
-        let mut i = proof.frames.len();
-        for frame in proof.frames {
-            println!("==== Frame {i} ====");
-            for chain in frame.chains {
-                if chain.is_terminal() {
-                    print!("(AXIOM) ");
-                }
-                print!("|- ");
-                if chain.formulas.len() > 1 {
-                    print!("{{");
-                }
-
-                print!(
-                    "{}",
-                    chain
-                        .formulas
-                        .iter()
-                        .map(|e| format!("{e}"))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-
-                if chain.formulas.len() > 1 {
-                    print!("}}");
-                }
-
-                print!("      ");
+    proof.frames.reverse();
+    let mut i = proof.frames.len();
+    for frame in proof.frames {
+        println!("==== Frame {i} ====");
+        for chain in frame.chains {
+            if chain.is_terminal() {
+                print!("(AXIOM) ");
             }
-            i -= 1;
-            println!("\n");
+            print!("|- ");
+            if chain.formulas.len() > 1 {
+                print!("{{");
+            }
+
+            print!(
+                "{}",
+                chain
+                    .formulas
+                    .iter()
+                    .map(|e| format!("{e}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+
+            if chain.formulas.len() > 1 {
+                print!("}}");
+            }
+
+            print!("      ");
         }
-        return;
+        i -= 1;
+        println!("\n");
     }
+}
+
+fn run_table(used_vars: HashSet<char>, parsed: Box<Expr>, no_table: bool) {
     let mut used_vars: Vec<char> = used_vars.into_iter().collect();
     used_vars.sort();
     let used_vars = UsedVars(used_vars);
@@ -181,7 +177,7 @@ fn main() {
         table.add_row(row);
     }
 
-    if !args.no_table {
+    if !no_table {
         table.printstd();
     }
 
@@ -190,4 +186,19 @@ fn main() {
     } else {
         println!("This is NOT a tautology!");
     }
+}
+
+fn main() {
+    let args = Cli::parse();
+    let expr = ExprParser::new();
+    let mut used_vars = HashSet::new();
+    let parsed = expr.parse(&mut used_vars, &args.expression).unwrap();
+    if args.clause {
+        run_clause(parsed);
+    } else if args.proof {
+        run_proof(parsed);
+    } else {
+        run_table(used_vars, parsed, args.no_table);
+    }
+    
 }
